@@ -1,0 +1,39 @@
+apiVersion: v2
+name: weatherapp-auth
+description: The authentication microservice for the weather app
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+#appVersion: "0.0.3"
+
+appVersion: "0.0.1"
+# for course 10 the images are tagged with 0.0.1
+
+# this is a dependency chart, created whenever the auth chart is run.  This is for the mysql instance.
+# The name "mysql" will be used to refer to this child chart from the parent auth chart.
+dependencies:
+  - name: mysql
+  # the name mysql will be referenced in the deployment.yaml file when we define the env vars.
+    #version: 8.8.14
+    version: 11.1.3
+    # latest at the time of recording but may need to update this. Latest is now 11.1.3
+    # re-run the "helm dependency build" and remove the Charts.lock file and move charts folder to backup. A new
+    # charts folder will be created.
+    repository: https://charts.bitnami.com/bitnami
