@@ -15,3 +15,5 @@ secret.yaml
 gitlab-config
 gitlab*-config
 gitlab2-config
+*.pem
+db-data
