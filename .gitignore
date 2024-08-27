@@ -1,0 +1,17 @@
+keys_and_credentials
+node_modules
+package-lock.json
+index.yaml
+cert.pem
+key.pem
+cert*.pem
+key*.pem
+home/ubuntu/course10_helm_with_kops/mycharts_making_charts/myapp_0.2.0_api21_tar__files_weather_redis/myapp/templates/secret.yaml
+/home/ubuntu/course10_helm_with_kops/mycharts_making_charts/myapp_0.1.1_api2_tar_files_weather/myapp/other_templates/secret.yaml
+secret.yaml
+*.crt
+*.csr
+*.key
+gitlab-config
+gitlab*-config
+gitlab2-config
