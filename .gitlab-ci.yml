@@ -30,21 +30,25 @@ build:
     #- cd auth
     # first go into the auth directory source code for the authentication microservice.  I need full path here
     # because my root repo is 2 directories above the source code and root has to have the gitlab-ci.yml
-    - docker build -t $CI_REGISTRY_USER/weatherapp-auth . --no-cache
+    - docker build -t $CI_REGISTRY_USER/weatherapp-auth2 . --no-cache
     # no tag needed. We are just validating that docker can build the image from the auth source code.
+    # adding the 2 to the name (weatherapp-auth2) because helm values.yaml is using the 2 to differentiate this
+    # from a previous setup.  Same has to be done for ui and weather microservices
+    # These builds in BUILD stage will not be pushed to dockerhub or used by helm but just doing it here for consistency
+    # The 2 must be added in the PUSH stage below because those are the images that helm uses.
 
     - cd ../UI
-    - docker build -t $CI_REGISTRY_USER/weatherapp-ui .
+    - docker build -t $CI_REGISTRY_USER/weatherapp-ui2 .
 
     - cd ../weather
-    - docker build -t $CI_REGISTRY_USER/weatherapp-weather .
+    - docker build -t $CI_REGISTRY_USER/weatherapp-weather2 .
   rules: 
     - if: '$CI_COMMIT_TAG == null'
     # run this only if no commit tag present
     # this will be run for all branches if no git tag present
     # All branches whenever code is pushed. This only tests if buildable
     # if git tag is present we need to skip this stage (build) and push and go directly to a stage called promote(developed later)
-
+    # NOTE: this is CI_COMMIT_TAG a git tag, this is not CI_COMMIT_SHA a generic hash of the commit that is used to tag the docker build (see PUSH stage below)
 
 
 
@@ -62,15 +66,15 @@ push:
   # CI_COMMIT_SHA has a hash of the commit.
     #- cd auth
     - cd source_files/weatherapp/auth
-    - docker build -t $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_SHA . --no-cache
+    - docker build -t $CI_REGISTRY_USER/weatherapp-auth2:$CI_COMMIT_SHA . --no-cache
     - docker push $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_SHA
 
     - cd ../UI
-    - docker build -t $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_SHA .
+    - docker build -t $CI_REGISTRY_USER/weatherapp-ui2:$CI_COMMIT_SHA .
     - docker push $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_SHA
     
     - cd ../weather
-    - docker build -t $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_SHA .
+    - docker build -t $CI_REGISTRY_USER/weatherapp-weather2:$CI_COMMIT_SHA .
     - docker push $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_SHA
   only:
     - main
