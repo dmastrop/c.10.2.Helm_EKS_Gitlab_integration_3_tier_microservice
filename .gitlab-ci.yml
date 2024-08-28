@@ -154,6 +154,8 @@ deliver:
     - main
     # this is restricted only to main branch. We do not want to stage unless it is merged and validated code to main branch and then publish to staging
     # Thus a feature branch commit for exxample will not trigger this DELIVER block of code.
+    # Implicit in this decision is that QA has validate the feature code prior to the completion of the merge of feature in to main via the approve MR
+    # QA will have input into this decision.
 
 
 
