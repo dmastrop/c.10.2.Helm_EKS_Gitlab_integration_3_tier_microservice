@@ -40,9 +40,9 @@ build:
   rules: 
     - if: '$CI_COMMIT_TAG == null'
     # run this only if no commit tag present
-    # this will be run for all branches if no tag present
+    # this will be run for all branches if no git tag present
     # All branches whenever code is pushed. This only tests if buildable
-    # if tag is present we need to skip this stage (build) and push and go directly to a stage called promote(developed later)
+    # if git tag is present we need to skip this stage (build) and push and go directly to a stage called promote(developed later)
 
 
 
