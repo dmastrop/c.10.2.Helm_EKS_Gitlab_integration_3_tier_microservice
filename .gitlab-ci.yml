@@ -1,0 +1,257 @@
+## STAGE1 of the gitlab-ci yml file development is build and push jobs
+## STAGE2 of the gitlab-ci yml file is deliver to staging
+## STAGE3 of the gitlab-ci yml file is deployment to production environment
+
+stages:
+# this governs the order that the stages will be run
+  - build
+  - push
+  - deliver
+  - promote
+  - deploy
+
+
+
+build:
+  image: docker:latest
+  # this is a docker image that has the docker client baked into it. Used in CI/CD to build docker images
+  # from a container
+  stage: build
+  # name of the stage for reference in the pipeline
+  services:
+    - docker:dind
+    # docker in docker service
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    # this will run before main script below. Login using the gitlab credentials that we added to gitlab project
+  script:
+    - cd source_files/weatherapp/auth
+    #- cd auth
+    # first go into the auth directory source code for the authentication microservice.  I need full path here
+    # because my root repo is 2 directories above the source code and root has to have the gitlab-ci.yml
+    - docker build -t $CI_REGISTRY_USER/weatherapp-auth . --no-cache
+    # no tag needed. We are just validating that docker can build the image from the auth source code.
+
+    - cd ../UI
+    - docker build -t $CI_REGISTRY_USER/weatherapp-ui .
+
+    - cd ../weather
+    - docker build -t $CI_REGISTRY_USER/weatherapp-weather .
+  rules: 
+    - if: '$CI_COMMIT_TAG == null'
+    # run this only if no commit tag present
+    # this will be run for all branches if no tag present
+    # All branches whenever code is pushed. This only tests if buildable
+    # if tag is present we need to skip this stage (build) and push and go directly to a stage called promote(developed later)
+
+
+
+
+push:
+#  If the image has a tag we do not need to run this again. Skip build and push and jump
+# to stage called promote
+  image: docker:latest
+  stage: push
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+  script:
+  # need to tag them because these images are pushed to docker hub
+  # CI_COMMIT_SHA has a hash of the commit.
+    #- cd auth
+    - cd source_files/weatherapp/auth
+    - docker build -t $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_SHA . --no-cache
+    - docker push $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_SHA
+
+    - cd ../UI
+    - docker build -t $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_SHA
+    
+    - cd ../weather
+    - docker build -t $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_SHA
+  only:
+    - main
+    # only push the tagged image if on main branch.
+    # we do not want to push all branches to docker hub
+
+
+
+# deliver:
+#   stage: deliver
+#   # For app deployment we will use helm
+#   image:
+#     name: alpine/helm:latest
+#     # helm image has helm command as entrypoint. WE do not want this default behavior. OVerride entrypoint with
+#     # empty string below.  Before script below is a good example of this usage requirement outside of the helm context.
+#     entrypoint: [""]
+#   before_script:
+#     - apk add py3-pip
+
+#     ## This pip3 installation method is now longer working
+#     #- pip3 install awscli
+#     # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
+
+#     ## try using the method below with apk
+#     # install dependencies
+#     - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
+#     # install awscli
+#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+#     - apk add aws-cli
+
+#     ## try this
+#     #- pip install urllib3
+#     #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
+#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
+
+#     # ## ALTERNATE SOLUTION is to use a virtual environment.
+#     # - python3 -m venv /path/to/venv
+#     # # activate the venv
+#     # - . /path/to/venv/bin/activate
+#     # # install awscli within this virtual environment
+#     # - pip install awscli
+#     # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
+#     # - deactivate
+
+
+#     #- aws configure set region "eu-west-2"
+#     - aws configure set region "us-east-1"
+#     - mkdir /tmp/.kube
+#     #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
+#     - echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
+#     # helm needs access to kubeconfig to provision the app on the EKS cluster
+#     # The K8S-CONFIG env variable
+#     - helm repo add bitnami https://charts.bitnami.com/bitnami
+#     # this is required for mysql dependency helm chart
+#   script:
+#     #- cd weatherapp-auth
+#     - cd source_files/weatherapp/weatherapp-auth
+#     # get the dependency chart for mysql
+#     - helm dependency build .
+#     #- helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHORT_SHA .
+#     - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHA .
+#     # note that this is in namepace staging. Note that image tag is commit hash.
+#     - cd ../weatherapp-ui
+#     #- helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHORT_SHA .
+#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHA .
+#     - cd ../weatherapp-weather
+#     #- helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHORT_SHA .
+#     - helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHA .
+#   only:
+#     - main
+#     # this is restricted only to main branch. We do not want to stage unless it is merged and validated code to main branch and then publish to staging
+
+
+
+
+
+
+
+
+# promote:
+#   stage: promote
+#   services:
+#     - docker:dind
+#   image: docker:latest
+#   before_script:
+#     - apk add git
+#     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+
+#     # need to get the commit hash that corresponds to the tag that we will use
+#     # For example: git rev-list -n 1 1.0.0 
+#     # will give the commit hash in the git log that has this 1.0.0 version
+#     # This will be reffered to as the TAGGED_HASH.   CI_COMMIT_TAG for example is the 1.0.0 assigned tag to the commit
+#     # The TAGGED_HASH are the docker images already pushed to docker hub
+
+#     - TAGGED_HASH=`git rev-list -n 1 $CI_COMMIT_TAG`
+#   script:
+#     - echo "Promoting Docker images"
+#     # pull the commit tagged TAGGED_HASH image that is tagged with the CI_COMMIT_TAG, for example 1.0.0
+#     - docker pull $CI_REGISTRY_USER/weatherapp-ui:$TAGGED_HASH
+#     - docker pull $CI_REGISTRY_USER/weatherapp-auth:$TAGGED_HASH
+#     - docker pull $CI_REGISTRY_USER/weatherapp-weather:$TAGGED_HASH
+#     # Next tag the TAGGED_HASH version back but as the CI_COMMIT_TAG. Thus we have a 1.0.0. docker tagged image now for promotion candidate
+#     - docker tag $CI_REGISTRY_USER/weatherapp-ui:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_TAG
+#     - docker tag $CI_REGISTRY_USER/weatherapp-auth:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_TAG
+#     - docker tag $CI_REGISTRY_USER/weatherapp-weather:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_TAG
+#     # Push these CI_COMMIT_TAG, for example 1.0.0 images to docker hub so that they can be accessed for promotion to deployment
+#     - docker push $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_TAG
+#     - docker push $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_TAG
+#     - docker push $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_TAG
+#   rules:
+#   # any image that has been git tagged as above with git rev-list -n 1 $CI_COMMIT_TAG will get this promotion candidacy and push to docker hub for possible
+#   # deployment
+#   # ALL git tagged images will be promoted and are candidates to be manually promoted to production (final stage below)
+#     - if: '$CI_COMMIT_TAG'
+
+
+
+
+
+# deploy:
+# # The deploy stage is based on many approvals. This is deployment to production (k8s namespace default)
+# # Thus it will be manual and not auto-triggered based upon a branch push.
+
+#   stage: deploy
+#   image:
+#     name: alpine/helm:latest
+#     entrypoint: [""]
+
+#   before_script:
+#     - apk add py3-pip
+
+#     ## This pip3 installation method is now longer working
+#     #- pip3 install awscli
+#     # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
+
+#     ## try using the method below with apk
+#     # install dependencies
+#     - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
+#     # install awscli
+#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+#     - apk add aws-cli
+
+#     ## try this
+#     #- pip install urllib3
+#     #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
+#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
+
+#     # ## ALTERNATE SOLUTION is to use a virtual environment.
+#     # - python3 -m venv /path/to/venv
+#     # # activate the venv
+#     # - . /path/to/venv/bin/activate
+#     # # install awscli within this virtual environment
+#     # - pip install awscli
+#     # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
+#     # - deactivate
+
+
+#     #- aws configure set region "eu-west-2"
+#     - aws configure set region "us-east-1"
+#     - mkdir /tmp/.kube
+#     #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
+#     - echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
+#     # helm needs access to kubeconfig to provision the app on the EKS cluster
+#     # The K8S-CONFIG env variable
+#     - helm repo add bitnami https://charts.bitnami.com/bitnami
+#     # this is required for mysql dependency helm chart
+  
+#   script:
+#     # access the respective helm charts for the microservices app deployments similar to deliver stage above
+#     # This stage is similar to deliver stage with 2 differences: Use CI_COMMIT_TAG in helm deployment. These are promoted images in promote stage above
+#     # Second difference is deployment is to default namespcace on K8s cluster and not the staging namespace.
+#     # ALTERNATIVELY we can deploy to a different k8s cluster if required by changing the --kubeconfig argument below.
+#     #- cd weatherapp-auth
+#     - cd source_files/weatherapp/weatherapp-auth
+#     - helm dependency build .
+#     - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_TAG .
+#     - cd ../weatherapp-ui
+#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui --set image.tag=$CI_COMMIT_TAG .
+#     - cd ../weatherapp-weather
+#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_TAG .
+#   rules:
+#     # only promoted builds with CI_COMMIT_TAG (git tagged) are candidates for promotion to production deployment.
+#     - if: '$CI_COMMIT_TAG'
+#     # see above. It must be manual due to approval process. User has to presss a button to deploy to production.
+#       when: manual
