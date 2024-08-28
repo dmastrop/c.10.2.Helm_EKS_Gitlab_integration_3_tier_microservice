@@ -3,7 +3,8 @@
 ## STAGE3 of the gitlab-ci yml file is deployment to production environment
 
 stages:
-# this governs the order that the stages will be run
+# this governs the order that the stages will be run only. A stage below can be commented out and this order will
+# still be maintained but that stage commented out will not be executed.
   - build
   - push
   - deliver
@@ -48,7 +49,7 @@ build:
 
 
 push:
-#  If the image has a tag we do not need to run this again. Skip build and push and jump
+#  If the image has a git tag we do not need to run this again. Skip build and push and jump
 # to stage called promote
   image: docker:latest
   stage: push
@@ -78,69 +79,69 @@ push:
 
 
 
-# deliver:
-#   stage: deliver
-#   # For app deployment we will use helm
-#   image:
-#     name: alpine/helm:latest
-#     # helm image has helm command as entrypoint. WE do not want this default behavior. OVerride entrypoint with
-#     # empty string below.  Before script below is a good example of this usage requirement outside of the helm context.
-#     entrypoint: [""]
-#   before_script:
-#     - apk add py3-pip
+deliver:
+  stage: deliver
+  # For app deployment we will use helm
+  image:
+    name: alpine/helm:latest
+    # helm image has helm command as entrypoint. WE do not want this default behavior. OVerride entrypoint with
+    # empty string below.  Before script below is a good example of this usage requirement outside of the helm context.
+    entrypoint: [""]
+  before_script:
+    - apk add py3-pip
 
-#     ## This pip3 installation method is now longer working
-#     #- pip3 install awscli
-#     # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
+    ## This pip3 installation method is now longer working
+    #- pip3 install awscli
+    # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
 
-#     ## try using the method below with apk
-#     # install dependencies
-#     - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
-#     # install awscli
-#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
-#     - apk add aws-cli
+    ## try using the method below with apk
+    # install dependencies
+    - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
+    # install awscli
+    #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+    - apk add aws-cli
 
-#     ## try this
-#     #- pip install urllib3
-#     #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
-#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
+    ## try this
+    #- pip install urllib3
+    #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
+    #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
 
-#     # ## ALTERNATE SOLUTION is to use a virtual environment.
-#     # - python3 -m venv /path/to/venv
-#     # # activate the venv
-#     # - . /path/to/venv/bin/activate
-#     # # install awscli within this virtual environment
-#     # - pip install awscli
-#     # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
-#     # - deactivate
+    # ## ALTERNATE SOLUTION is to use a virtual environment.
+    # - python3 -m venv /path/to/venv
+    # # activate the venv
+    # - . /path/to/venv/bin/activate
+    # # install awscli within this virtual environment
+    # - pip install awscli
+    # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
+    # - deactivate
 
 
-#     #- aws configure set region "eu-west-2"
-#     - aws configure set region "us-east-1"
-#     - mkdir /tmp/.kube
-#     #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
-#     - echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
-#     # helm needs access to kubeconfig to provision the app on the EKS cluster
-#     # The K8S-CONFIG env variable
-#     - helm repo add bitnami https://charts.bitnami.com/bitnami
-#     # this is required for mysql dependency helm chart
-#   script:
-#     #- cd weatherapp-auth
-#     - cd source_files/weatherapp/weatherapp-auth
-#     # get the dependency chart for mysql
-#     - helm dependency build .
-#     #- helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHORT_SHA .
-#     - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHA .
-#     # note that this is in namepace staging. Note that image tag is commit hash.
-#     - cd ../weatherapp-ui
-#     #- helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHORT_SHA .
-#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHA .
-#     - cd ../weatherapp-weather
-#     #- helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHORT_SHA .
-#     - helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHA .
-#   only:
-#     - main
-#     # this is restricted only to main branch. We do not want to stage unless it is merged and validated code to main branch and then publish to staging
+    #- aws configure set region "eu-west-2"
+    - aws configure set region "us-east-1"
+    - mkdir /tmp/.kube
+    #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
+    - echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
+    # helm needs access to kubeconfig to provision the app on the EKS cluster
+    # The K8S-CONFIG env variable
+    - helm repo add bitnami https://charts.bitnami.com/bitnami
+    # this is required for mysql dependency helm chart
+  script:
+    #- cd weatherapp-auth
+    - cd source_files/weatherapp/weatherapp-auth
+    # get the dependency chart for mysql
+    - helm dependency build .
+    #- helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHORT_SHA .
+    - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHA .
+    # note that this is in namepace staging. Note that image tag is commit hash.
+    - cd ../weatherapp-ui
+    #- helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHORT_SHA .
+    - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui -n staging --set image.tag=$CI_COMMIT_SHA .
+    - cd ../weatherapp-weather
+    #- helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHORT_SHA .
+    - helm upgrade --install --kubeconfig /tmp/.kube/config -n staging weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_SHA .
+  only:
+    - main
+    # this is restricted only to main branch. We do not want to stage unless it is merged and validated code to main branch and then publish to staging
 
 
 
