@@ -67,15 +67,15 @@ push:
     #- cd auth
     - cd source_files/weatherapp/auth
     - docker build -t $CI_REGISTRY_USER/weatherapp-auth2:$CI_COMMIT_SHA . --no-cache
-    - docker push $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_USER/weatherapp-auth2:$CI_COMMIT_SHA
 
     - cd ../UI
     - docker build -t $CI_REGISTRY_USER/weatherapp-ui2:$CI_COMMIT_SHA .
-    - docker push $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_USER/weatherapp-ui2:$CI_COMMIT_SHA
     
     - cd ../weather
     - docker build -t $CI_REGISTRY_USER/weatherapp-weather2:$CI_COMMIT_SHA .
-    - docker push $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_USER/weatherapp-weather2:$CI_COMMIT_SHA
   only:
     - main
     # only push the tagged image if on main branch.
