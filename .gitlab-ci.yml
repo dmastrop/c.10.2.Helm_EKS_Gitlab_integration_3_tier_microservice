@@ -137,7 +137,7 @@ deliver:
     # get the dependency chart for mysql. This needs to be installed on the helm container from scratch.
     - helm dependency build .
     #- helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHORT_SHA .
-    # We have to use the gitlab CI_COMMIT_SHORT_SHA because helm does not allow programmatic modification of the Chart.yaml file appVersion which is normally used to tag
+    # We have to use the gitlab CI_COMMIT_SHA or SHORT because helm does not allow programmatic modification of the Chart.yaml file appVersion which is normally used to tag
     # the image
     - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config -n staging --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_SHA .
     # note that this is in namepace staging. Note that image tag is commit hash.  Staging is used for the nonproduction and default ns will be used for production deployment.
