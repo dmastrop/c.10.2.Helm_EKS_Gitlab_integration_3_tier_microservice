@@ -2,6 +2,12 @@
 ## STAGE2 of the gitlab-ci yml file is deliver to staging
 ## STAGE3 of the gitlab-ci yml file is deployment to production environment
 
+## stage rules are based upon rules: value in the stage
+## BUILD will only execute only if CI_COMMIT_TAG is null
+## PUSH and DELIVER will execture only if push to main branch
+## PROMOTE and DEPLOY will execute only if CI_COMMIT_TAG is not null (i.e. for builds pertaining to commits that have been
+## git tagged via git tag -a <tag> <commit_hash> -m "comment")
+
 stages:
 # this governs the order that the stages will be run only. A stage below can be commented out and this order will
 # still be maintained but that stage commented out will not be executed.
@@ -168,109 +174,119 @@ deliver:
 
 
 
-# promote:
-#   stage: promote
-#   services:
-#     - docker:dind
-#   image: docker:latest
-#   before_script:
-#     - apk add git
-#     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+promote:
+# code promotion will be done via git tagging.  This will tag the commits that are candidates for promotion to production deployment (default 
+# kubernetes namespace on the EKS cluster)
+  stage: promote
+  services:
+    - docker:dind
+  image: docker:latest
+  before_script:
+    - apk add git
+    # install git becasue the container will need to use git rev-list (see below)
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
 
-#     # need to get the commit hash that corresponds to the tag that we will use
-#     # For example: git rev-list -n 1 1.0.0 
-#     # will give the commit hash in the git log that has this 1.0.0 version
-#     # This will be reffered to as the TAGGED_HASH.   CI_COMMIT_TAG for example is the 1.0.0 assigned tag to the commit
-#     # The TAGGED_HASH are the docker images already pushed to docker hub
+    # need to get the commit hash that corresponds to the tag that we will use
+    # For example: git rev-list -n 1 1.0.0 where 1.0.0 is a tagged commit
+    # will give the commit hash in the git log that has this 1.0.0 version
+    # This will be reffered to as the TAGGED_HASH.   CI_COMMIT_TAG for example is the 1.0.0 assigned tag to the commit
+    # The TAGGED_HASH will identify the docker image that has already been pushed to docker hub from a previous stage that is now
+    # marked for promotion to deploy to production (default namespace on the EKS cluster)
 
-#     - TAGGED_HASH=`git rev-list -n 1 $CI_COMMIT_TAG`
-#   script:
-#     - echo "Promoting Docker images"
-#     # pull the commit tagged TAGGED_HASH image that is tagged with the CI_COMMIT_TAG, for example 1.0.0
-#     - docker pull $CI_REGISTRY_USER/weatherapp-ui:$TAGGED_HASH
-#     - docker pull $CI_REGISTRY_USER/weatherapp-auth:$TAGGED_HASH
-#     - docker pull $CI_REGISTRY_USER/weatherapp-weather:$TAGGED_HASH
-#     # Next tag the TAGGED_HASH version back but as the CI_COMMIT_TAG. Thus we have a 1.0.0. docker tagged image now for promotion candidate
-#     - docker tag $CI_REGISTRY_USER/weatherapp-ui:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_TAG
-#     - docker tag $CI_REGISTRY_USER/weatherapp-auth:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_TAG
-#     - docker tag $CI_REGISTRY_USER/weatherapp-weather:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_TAG
-#     # Push these CI_COMMIT_TAG, for example 1.0.0 images to docker hub so that they can be accessed for promotion to deployment
-#     - docker push $CI_REGISTRY_USER/weatherapp-ui:$CI_COMMIT_TAG
-#     - docker push $CI_REGISTRY_USER/weatherapp-auth:$CI_COMMIT_TAG
-#     - docker push $CI_REGISTRY_USER/weatherapp-weather:$CI_COMMIT_TAG
-#   rules:
-#   # any image that has been git tagged as above with git rev-list -n 1 $CI_COMMIT_TAG will get this promotion candidacy and push to docker hub for possible
-#   # deployment
-#   # ALL git tagged images will be promoted and are candidates to be manually promoted to production (final stage below)
-#     - if: '$CI_COMMIT_TAG'
-
-
-
-
-
-# deploy:
-# # The deploy stage is based on many approvals. This is deployment to production (k8s namespace default)
-# # Thus it will be manual and not auto-triggered based upon a branch push.
-
-#   stage: deploy
-#   image:
-#     name: alpine/helm:latest
-#     entrypoint: [""]
-
-#   before_script:
-#     - apk add py3-pip
-
-#     ## This pip3 installation method is now longer working
-#     #- pip3 install awscli
-#     # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
-
-#     ## try using the method below with apk
-#     # install dependencies
-#     - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
-#     # install awscli
-#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
-#     - apk add aws-cli
-
-#     ## try this
-#     #- pip install urllib3
-#     #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
-#     #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
-
-#     # ## ALTERNATE SOLUTION is to use a virtual environment.
-#     # - python3 -m venv /path/to/venv
-#     # # activate the venv
-#     # - . /path/to/venv/bin/activate
-#     # # install awscli within this virtual environment
-#     # - pip install awscli
-#     # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
-#     # - deactivate
+    - TAGGED_HASH=`git rev-list -n 1 $CI_COMMIT_TAG`
+    # the value of this is a commit hash
+  script:
+    - echo "Promoting Docker images"
+    # pull the commit tagged TAGGED_HASH image that is tagged with the CI_COMMIT_TAG, for example 1.0.0
+    # make sure to add the 2 to the image names as this is using 2nd docker repos.
+    - docker pull $CI_REGISTRY_USER/weatherapp-ui2:$TAGGED_HASH
+    - docker pull $CI_REGISTRY_USER/weatherapp-auth2:$TAGGED_HASH
+    - docker pull $CI_REGISTRY_USER/weatherapp-weather2:$TAGGED_HASH
+    # Next tag the TAGGED_HASH version (a version with a commit hash) back but as the CI_COMMIT_TAG (a git tag). 
+    # Thus we have a 1.0.0. docker tagged image now for promotion candidate
+    - docker tag $CI_REGISTRY_USER/weatherapp-ui2:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-ui2:$CI_COMMIT_TAG
+    - docker tag $CI_REGISTRY_USER/weatherapp-auth2:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-auth2:$CI_COMMIT_TAG
+    - docker tag $CI_REGISTRY_USER/weatherapp-weather2:$TAGGED_HASH $CI_REGISTRY_USER/weatherapp-weather2:$CI_COMMIT_TAG
+    # Push these CI_COMMIT_TAG, for example 1.0.0 images to docker hub so that they can be accessed for promotion to deployment EKS cluster (default ns)
+    - docker push $CI_REGISTRY_USER/weatherapp-ui2:$CI_COMMIT_TAG
+    - docker push $CI_REGISTRY_USER/weatherapp-auth2:$CI_COMMIT_TAG
+    - docker push $CI_REGISTRY_USER/weatherapp-weather2:$CI_COMMIT_TAG
+    # These CI_COMMIT_TAG tagged docker images are the ones available for promotion to deployment.
+  rules:
+  # any image that has been git tagged as above with commit hash of git rev-list -n 1 $CI_COMMIT_TAG will get this promotion candidacy 
+  # and push to docker hub for possible manual deployment to production EKS cluster (default ns)
+  # ALL git tagged images will be promoted and are candidates to be manually promoted to production (final stage below)
+    - if: '$CI_COMMIT_TAG'
 
 
-#     #- aws configure set region "eu-west-2"
-#     - aws configure set region "us-east-1"
-#     - mkdir /tmp/.kube
-#     #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
-#     - echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
-#     # helm needs access to kubeconfig to provision the app on the EKS cluster
-#     # The K8S-CONFIG env variable
-#     - helm repo add bitnami https://charts.bitnami.com/bitnami
-#     # this is required for mysql dependency helm chart
+
+
+
+deploy:
+# The deploy stage is based on many approvals. This is deployment to production (k8s namespace default)
+# Thus it will be manual and not auto-triggered based upon a branch push.
+
+  stage: deploy
+  image:
+    name: alpine/helm:latest
+    entrypoint: [""]
+
+  before_script:
+    - apk add py3-pip
+
+    ## This pip3 installation method is no longer working
+    #- pip3 install awscli
+    # For non-EKS cluster do not need this awscli installed. This is only for EKS cluster (which is what I am using)
+
+    ## try using the method below with apk
+    # install dependencies
+    - apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml py3-urllib3
+    # install awscli
+    #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+    - apk add aws-cli
+
+    ## try this
+    #- pip install urllib3
+    #- apk add python3 py3-awscrt py3-certifi py3-colorama py3-cryptography py3-dateutil py3-distro py3-docutils py3-jmespath py3-prompt_toolkit py3-ruamel.yaml
+    #- apk add aws-cli –repository=https://dl-cdn.alpinelinux.org/alpine/edge/community/x86_64
+
+    # ## ALTERNATE SOLUTION is to use a virtual environment.
+    # - python3 -m venv /path/to/venv
+    # # activate the venv
+    # - . /path/to/venv/bin/activate
+    # # install awscli within this virtual environment
+    # - pip install awscli
+    # # exit the venv (note this does not remove it' it can be reactivated with the activate command above)
+    # - deactivate
+
+
+    #- aws configure set region "eu-west-2"
+    - aws configure set region "us-east-1"
+    - mkdir /tmp/.kube
+    #- echo $K8S-CONFIG | base64 -d > /tmp/.kube/config
+    #- echo $KUBECONFIG_EKS | base64 -d > /tmp/.kube/config
+    - echo $K8SCONFIG | base64 -d > /tmp/.kube/config
+    # helm needs access to kubeconfig to provision the app on the EKS cluster
+    # The K8S-CONFIG env variable
+    - helm repo add bitnami https://charts.bitnami.com/bitnami
+    # this is required for mysql dependency helm chart
   
-#   script:
-#     # access the respective helm charts for the microservices app deployments similar to deliver stage above
-#     # This stage is similar to deliver stage with 2 differences: Use CI_COMMIT_TAG in helm deployment. These are promoted images in promote stage above
-#     # Second difference is deployment is to default namespcace on K8s cluster and not the staging namespace.
-#     # ALTERNATIVELY we can deploy to a different k8s cluster if required by changing the --kubeconfig argument below.
-#     #- cd weatherapp-auth
-#     - cd source_files/weatherapp/weatherapp-auth
-#     - helm dependency build .
-#     - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_TAG .
-#     - cd ../weatherapp-ui
-#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui --set image.tag=$CI_COMMIT_TAG .
-#     - cd ../weatherapp-weather
-#     - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_TAG .
-#   rules:
-#     # only promoted builds with CI_COMMIT_TAG (git tagged) are candidates for promotion to production deployment.
-#     - if: '$CI_COMMIT_TAG'
-#     # see above. It must be manual due to approval process. User has to presss a button to deploy to production.
-#       when: manual
+  script:
+    # access the respective helm charts for the microservices app deployments similar to deliver stage above
+    # This stage is similar to deliver stage with 2 differences: Use CI_COMMIT_TAG in helm deployment. These are promoted images in promote stage above
+    # Second difference is deployment is to default namespcace on K8s cluster and not the staging namespace.
+    # ALTERNATIVELY we can deploy to a different k8s cluster if required by changing the --kubeconfig argument below.
+    # NOTE: this stage only uses CI_COMMIT_TAG tagged docker builds that are promoted builds (see above)
+    #- cd weatherapp-auth
+    - cd source_files/weatherapp/weatherapp-auth
+    - helm dependency build .
+    - helm upgrade --install weatherapp-auth --kubeconfig /tmp/.kube/config --set mysql.auth.rootPassword=$DB_PASSWORD --set image.tag=$CI_COMMIT_TAG .
+    - cd ../weatherapp-ui
+    - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-ui --set image.tag=$CI_COMMIT_TAG .
+    - cd ../weatherapp-weather
+    - helm upgrade --install --kubeconfig /tmp/.kube/config weatherapp-weather --set apikey=$API_KEY --set image.tag=$CI_COMMIT_TAG .
+  rules:
+    # only promoted builds with CI_COMMIT_TAG (git tagged) are candidates for promotion to production deployment.
+    - if: '$CI_COMMIT_TAG'
+    # see above. It must be manual due to approval process. User has to presss a button to deploy to production.
+      when: manual
